@@ -1,4 +1,4 @@
-const canvas = document.getElementById('gc');
+﻿const canvas = document.getElementById('gc');
 const ctx = canvas.getContext('2d', {alpha:false});
 const gw = document.getElementById('gw');
 const overlayEl = document.getElementById('overlay');
@@ -7,6 +7,7 @@ const bonusEl = document.getElementById('bonus');
 const factEl = document.getElementById('fact');
 const scoreEl = document.getElementById('hsc');
 const timeEl = document.getElementById('htime');
+const lifeEl = document.getElementById('hlife');
 const progressEl = document.getElementById('pfill');
 const gridCanvas = document.createElement('canvas');
 const gridCtx = gridCanvas.getContext('2d');
@@ -16,6 +17,7 @@ function resize() {
   viewW = gw.clientWidth;
   viewH = gw.clientHeight;
   dpr = Math.min(window.devicePixelRatio || 1, 2);
+  setShipSize();
   canvas.width = Math.round(viewW * dpr);
   canvas.height = Math.round(viewH * dpr);
   canvas.style.width = viewW + 'px';
@@ -28,6 +30,7 @@ function resize() {
 
 const W = () => viewW;
 const H = () => viewH;
+const gameScale = () => W() <= 760 ? 0.82 : 1;
 
 let gs = 'menu', score = 0, frame = 0, dist = 0;
 const BASE_GOAL = 9800;
@@ -36,14 +39,22 @@ const MAX_DT = 1 / 30;
 const START_TIME = 35;
 const BONUS_SCORE_STEP = 400;
 const BONUS_TIME = 5;
+const SHIP_MAX_HP = 3;
+const HIT_COOLDOWN = BASE_FPS * 2;
 
-let ship = {x:0,y:0,w:34,h:46,hp:3,inv:0,trail:[]};
+let ship = {x:0,y:0,w:34,h:46,hp:SHIP_MAX_HP,inv:0,trail:[]};
 let obstacles = [], buoys = [], sparks = [], waveRings = [];
 let scrollSpeed = 1.4;
-let timeLeft = START_TIME, nextBonusScore = BONUS_SCORE_STEP, missionGoal = BASE_GOAL;
-let nextObsFrame = 195, nextBuoyFrame = 155, hudFrame = 0, lastPct = -1, lastScore = -1, lastTimeText = '';
+let timeLeft = START_TIME, nextBonusScore = BONUS_SCORE_STEP, missionGoal = BASE_GOAL, failDelay = 0, failReason = '';
+let nextObsFrame = 195, nextBuoyFrame = 155, hudFrame = 0, lastPct = -1, lastScore = -1, lastHp = -1, lastTimeText = '';
 resize();
 window.addEventListener('resize', resize);
+
+function setShipSize() {
+  const s = gameScale();
+  ship.w = 34 * s;
+  ship.h = 46 * s;
+}
 
 const keys = {};
 window.addEventListener('keydown', e => { keys[e.key]=true; e.preventDefault(); });
@@ -98,7 +109,13 @@ function showToast(txt, dur=90) {
 }
 function showBonus(txt, dur=170) {
   bonusEl.textContent = txt;
+  bonusEl.classList.remove('damage');
   bonusEl.classList.add('show');
+  bonusT = dur;
+}
+function showDamage(txt, dur=170) {
+  bonusEl.textContent = txt;
+  bonusEl.classList.add('damage','show');
   bonusT = dur;
 }
 function showFact() {
@@ -109,19 +126,21 @@ function showFact() {
 
 function spawnObs(yOff) {
   const y = yOff || -80;
+  const s = gameScale();
   const big = Math.random() < 0.5;
   const side = Math.random() < 0.5;
   const cx = side ? W()*0.08 + Math.random()*W()*0.28 : W()*0.64 + Math.random()*W()*0.28;
-  obstacles.push({x: cx, y, w: big?80+Math.random()*70:50+Math.random()*50, h: big?28+Math.random()*36:18+Math.random()*26, type: Math.random()<0.65?'sand':'rock'});
+  obstacles.push({x: cx, y, w: (big?80+Math.random()*70:50+Math.random()*50)*s, h: (big?28+Math.random()*36:18+Math.random()*26)*s, type: Math.random()<0.65?'sand':'rock'});
   if (Math.random() < 0.35) {
-    obstacles.push({x: W()*0.22+Math.random()*W()*0.56, y: y-50, w:44+Math.random()*44, h:16+Math.random()*20, type:'rock'});
+    obstacles.push({x: W()*0.22+Math.random()*W()*0.56, y: y-50, w:(44+Math.random()*44)*s, h:(16+Math.random()*20)*s, type:'rock'});
   }
 }
 function spawnBuoy(yOff) {
+  const s = gameScale();
   const types = ['ERA5','GEBCO','UHSLC','CWL','GIS'];
   const cols = {ERA5:'#f4b520',GEBCO:'#00c6f8',UHSLC:'#00e887',CWL:'#ff8c42',GIS:'#c47fff'};
   const t = types[Math.floor(Math.random()*types.length)];
-  buoys.push({x: W()*0.12 + Math.random()*W()*0.76, y: yOff||-20, r:11, type:t, col:cols[t], p:Math.random()*6.28, collected:false});
+  buoys.push({x: W()*0.12 + Math.random()*W()*0.76, y: yOff||-20, r:11*s, type:t, col:cols[t], p:Math.random()*6.28, collected:false});
 }
 function spawnSparks(x,y,col,n=8) {
   for(let i=0;i<n;i++){
@@ -129,15 +148,35 @@ function spawnSparks(x,y,col,n=8) {
     sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:28,col});
   }
 }
+function overlaps(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+function getShipHitbox() {
+  return {
+    x: ship.x + ship.w * 0.12,
+    y: ship.y + ship.h * 0.12,
+    w: ship.w * 0.76,
+    h: ship.h * 0.82
+  };
+}
+function getObstacleHitbox(o) {
+  return {
+    x: o.x + 2,
+    y: o.y + 2,
+    w: Math.max(1, o.w - 4),
+    h: Math.max(1, o.h - 4)
+  };
+}
 
 function startGame() {
   overlayEl.style.display='none';
   gs='play'; score=0; frame=0; dist=0; scrollSpeed=1.4; missionGoal=BASE_GOAL;
-  timeLeft=START_TIME; nextBonusScore=BONUS_SCORE_STEP;
-  nextObsFrame=195; nextBuoyFrame=155; hudFrame=0; lastPct=-1; lastScore=-1; lastTimeText='';
+  timeLeft=START_TIME; nextBonusScore=BONUS_SCORE_STEP; failDelay=0; failReason='';
+  nextObsFrame=195; nextBuoyFrame=155; hudFrame=0; lastPct=-1; lastScore=-1; lastHp=-1; lastTimeText='';
+  setShipSize();
   ship.x = W()/2 - ship.w/2;
   ship.y = H()*0.72;
-  ship.hp=3; ship.inv=0; ship.trail=[];
+  ship.hp=SHIP_MAX_HP; ship.inv=0; ship.trail=[];
   obstacles=[]; buoys=[]; sparks=[]; waveRings=[];
   for(let i=0;i<5;i++) spawnObs(-(i+1)*260);
   for(let i=0;i<4;i++) spawnBuoy(-(i+1)*200-60);
@@ -224,10 +263,19 @@ function updateHud(force=false){
   const timeText=Math.max(0, Math.ceil(timeLeft))+'s';
   if(force || pct !== lastPct){ progressEl.style.width=pct+'%'; lastPct=pct; }
   if(force || score !== lastScore){ scoreEl.textContent=score; lastScore=score; }
+  if(force || ship.hp !== lastHp){ lifeEl.textContent=ship.hp+'/'+SHIP_MAX_HP; lastHp=ship.hp; }
   if(force || timeText !== lastTimeText){ timeEl.textContent=timeText; lastTimeText=timeText; }
 }
 
 function update(dt) {
+  if(gs==='hitfail'){
+    const step = dt * BASE_FPS;
+    failDelay -= step;
+    if(bonusT>0){ bonusT-=step; if(bonusT<=0) bonusEl.classList.remove('show','damage'); }
+    if(toastT>0){ toastT-=step; if(toastT<=0) toastEl.style.opacity='0'; }
+    if(failDelay<=0) endGame(false, failReason);
+    return;
+  }
   if(gs!=='play') return;
   const step = dt * BASE_FPS;
   timeLeft -= dt;
@@ -260,14 +308,21 @@ function update(dt) {
   if(frame>=factNext){ showFact(); factNext=frame+180+Math.floor(Math.random()*80); }
 
   if(ship.inv<=0){
-    const sx=ship.x+5,sy=ship.y+5,sw=ship.w-10,sh=ship.h-10;
+    const shipHitbox = getShipHitbox();
     for(const o of obstacles){
-      if(sx<o.x+o.w && sx+sw>o.x && sy<o.y+o.h && sy+sh>o.y){
-        ship.hp--; ship.inv=70;
+      if(overlaps(shipHitbox, getObstacleHitbox(o))){
+        ship.hp--; ship.inv=HIT_COOLDOWN;
         spawnSparks(ship.x+ship.w/2,ship.y+ship.h/2,'#ff5050',10);
         waveRings.push({x:ship.x+ship.w/2,y:ship.y+ship.h/2,radius:10,life:20,col:'#ff5050'});
+        updateHud(true);
+        showDamage('LIFE '+ship.hp+'/'+SHIP_MAX_HP);
         showToast('BETING PASIR! KEEL TERHANTUK!',90);
-        if(ship.hp<=0){ endGame(false,'Kapal anda karam pada beting pasir!'); return; }
+        if(ship.hp<=0){
+          gs='hitfail';
+          failDelay=BASE_FPS * 0.9;
+          failReason='Kapal anda karam pada beting pasir!';
+          return;
+        }
         break;
       }
     }
@@ -294,7 +349,7 @@ function update(dt) {
   if(dist>=missionGoal){ score+=500; updateHud(true); endGame(true); return; }
 
   if(toastT>0){ toastT-=step; if(toastT<=0) toastEl.style.opacity='0'; }
-  if(bonusT>0){ bonusT-=step; if(bonusT<=0) bonusEl.classList.remove('show'); }
+  if(bonusT>0){ bonusT-=step; if(bonusT<=0) bonusEl.classList.remove('show','damage'); }
   if(factT>0){ factT-=step; if(factT<=0) factEl.style.opacity='0'; }
 
   hudFrame += step;
