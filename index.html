@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Operation KPA</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div id="gw">
+  <canvas id="gc"></canvas>
+
+  <div id="hud">
+    <div class="hi2"><div class="hl">Depth 1941</div><div class="hv c" id="hd">2.1m</div></div>
+    <div class="hi2"><div class="hl">CWL</div><div class="hv g" id="hcwl">+1.81m</div></div>
+    <div class="hi2" style="min-width:160px;text-align:center"><div class="hl">KPA - December 8, 1941</div><div class="hv" style="font-size:10px;letter-spacing:2px;color:#f4b520">NAVIGATE TO SHORE</div></div>
+    <div class="hi2"><div class="hl">Time</div><div class="hv r" id="htime">35s</div></div>
+    <div class="hi2"><div class="hl">Score</div><div class="hv" id="hsc">0</div></div>
+  </div>
+
+  <div id="bar">
+    <span class="blab">THAILAND</span>
+    <div id="pbar"><div id="pfill"></div></div>
+    <span class="blab">KUALA PAK AMAT</span>
+  </div>
+
+  <div id="toast"></div>
+  <div id="bonus"></div>
+  <div id="fact"></div>
+  <div id="ctrl">MOUSE / ARROW KEYS TO STEER  |  AVOID SANDBARS  |  COLLECT DATA BUOYS</div>
+
+  <div id="overlay">
+    <h1>OPERATION KPA</h1>
+    <div class="sub">KUALA PAK AMAT - 8 DISEMBER 1941 - 00:30 HRS</div>
+
+    <div class="story">
+      <p>Anda mengetuai kapal pendaratan <span class="hi">Daihatsu</span> menuju ke pantai <span class="hi">Kuala Pak Amat, Kelantan</span> - serangan pertama Perang Pasifik, 82 minit sebelum Pearl Harbor.</p>
+
+      <p>Monsun Timur Laut telah menaikkan paras laut. Navigasi melalui perairan cetek, elakkan beting pasir, dan kumpulkan pungutan data hidrografi!</p>
+
+      <div class="fact">
+        Draf kapal: 1.1m | CWL: +1.81m | Angin: 7.2 m/s NE
+      </div>
+    </div>
+
+    <div class="sdgr">
+      <div class="sp" style="background:#fd9d24">SDG 11</div>
+      <div class="sp" style="background:#0a97d9">SDG 14</div>
+      <div class="sp" style="background:#c5192d">SDG 4</div>
+    </div>
+
+    <div style="display:flex;gap:6px;">
+      <button class="gbtn" id="startBtn">MULA MISI</button>
+    </div>
+
+    <div style="margin-top:10px;font-size:9px;color:rgba(200,160,60,0.35);letter-spacing:2px;">
+      GEOSPATIAL METAVERSE EMPOWERING HERITAGE - UiTM 2026
+    </div>
+  </div>
+</div>
+
+<script src="game.js?v=2"></script>
+
+</body>
+</html>
