@@ -1,4 +1,4 @@
-﻿const canvas = document.getElementById('gc');
+const canvas = document.getElementById('gc');
 const ctx = canvas.getContext('2d', {alpha:false});
 const gw = document.getElementById('gw');
 const overlayEl = document.getElementById('overlay');
@@ -240,7 +240,7 @@ function update(dt) {
   if(keys['ArrowLeft']||keys['a']) ship.x -= 3.2 * step;
   if(keys['ArrowRight']||keys['d']) ship.x += 3.2 * step;
   ship.x = Math.max(0, Math.min(W()-ship.w, ship.x));
-  if(ship.inv>0) ship.inv-=step;
+  if(ship.inv>0) ship.inv=Math.max(0, ship.inv-step);
 
   ship.trail.unshift({x:ship.x+ship.w/2, y:ship.y+ship.h, j:(Math.random()-0.5)*4});
   if(ship.trail.length>18) ship.trail.pop();
@@ -259,7 +259,7 @@ function update(dt) {
   if(frame>=nextBuoyFrame){ spawnBuoy(); nextBuoyFrame+=155; }
   if(frame>=factNext){ showFact(); factNext=frame+180+Math.floor(Math.random()*80); }
 
-  if(ship.inv===0){
+  if(ship.inv<=0){
     const sx=ship.x+5,sy=ship.y+5,sw=ship.w-10,sh=ship.h-10;
     for(const o of obstacles){
       if(sx<o.x+o.w && sx+sw>o.x && sy<o.y+o.h && sy+sh>o.y){
